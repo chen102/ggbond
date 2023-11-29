@@ -84,10 +84,19 @@ func (s *TCPServer) handle(tcpconn net.Conn) error {
 	}
 	go s.tcpreader(ctx, &wg, conn)
 	go tcpwrite(ctx, &wg, conn)
-	<-s.stopChannel
-	cancel()
-	wg.Wait()
-	return s.connManager.RemoveConn(conn)
+	for {
+		select {
+		case <-s.stopChannel:
+			cancel()
+			wg.Wait()
+			return s.connManager.RemoveConn(conn, "server stop")
+		case err := <-conn.WaitForClosed(): //读写协程出错，或者正常关闭
+			cancel()
+			wg.Wait()
+			return s.connManager.RemoveConn(conn, err.Error())
+		}
+	}
+
 }
 func GenerateConnID() int32 {
 	//UUIDV4 HASH
@@ -108,17 +117,24 @@ func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn conn
 		default:
 			if !conn.CheckHealth() {
 				log.Printf("conn %d tcpreader done", conn.GetConnID())
+				conn.SignalClose(errors.New("conn time out"))
 				return
 			}
 			msg := message.NewMessage("tcp")
 			if err := msg.ReadAndUnpack(reader); errors.Is(err, io.EOF) {
 				log.Printf("conn %d tcpreader done", conn.GetConnID())
+				conn.SignalClose(errors.New("read eof"))
 				return
 			}
 			log.Println("read from conn:", string(msg.GetBody()), msg.GetMessageID())
-			if msg.GetRouteID() == 1 {
+			switch msg.GetRouteID() {
+			case 1:
 				conn.UpdateLastActiveTime()
 				continue
+			case 9:
+				log.Printf("user %s logout", string(msg.GetBody()))
+				conn.SignalClose(nil)
+				return
 			}
 			if err := s.router.HandleMessage(msg.GetRouteID(), msg.GetBody()); err != nil {
 				log.Println("route error:", err, "msg:", msg)
@@ -139,7 +155,11 @@ func tcpwrite(ctx context.Context, wg *sync.WaitGroup, conn connmanage.IConn) {
 			return
 		case msg := <-conn.GetMessageChan():
 			// log.Println("write to conn...")
-			msg.PackAndWrite(writer)
+			if err := msg.PackAndWrite(writer); err != nil {
+				log.Printf("conn %d tcpwrite done", conn.GetConnID())
+				conn.SignalClose(errors.New("write eof"))
+				return
+			}
 			// log.Println("write to conn:", msg)
 		}
 	}

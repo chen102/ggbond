@@ -18,6 +18,7 @@ type TCPConn struct {
 	r                io.Reader
 	w                io.Writer
 	sendChan         chan message.IMessage
+	close            chan error
 }
 
 var _ IConn = (*TCPConn)(nil)
@@ -32,6 +33,7 @@ func NewTCPConn(conn net.Conn, connID int32, connType string) *TCPConn {
 		r:                conn,
 		w:                conn,
 		sendChan:         make(chan message.IMessage, 100),
+		close:            make(chan error),
 	}
 }
 func (c *TCPConn) GetSender() io.Writer {
@@ -55,7 +57,7 @@ func (c *TCPConn) CheckHealth() bool {
 	log.Println("check health:", c.connID)
 	return time.Now().Unix()-c.lastactivatetime < c.timeout
 }
-func (c *TCPConn) Close() error {
+func (c *TCPConn) Close(err error) error {
 	return c.conn.Close()
 }
 
@@ -70,4 +72,10 @@ func (c *TCPConn) SendMessage(msg message.IMessage) error {
 
 func (c *TCPConn) GetMessageChan() chan message.IMessage {
 	return c.sendChan
+}
+func (c *TCPConn) WaitForClosed() chan error {
+	return c.close
+}
+func (c *TCPConn) SignalClose(err error) {
+	c.close <- err
 }

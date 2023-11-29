@@ -14,7 +14,9 @@ type IConn interface {
 	GetConnID() int32
 	GetConn() (interface{}, error)
 	CheckHealth() bool
-	Close() error
+	Close(err error) error
+	WaitForClosed() chan error
+	SignalClose(err error)
 	GetSender() io.Writer
 	GetReader() io.Reader
 	UpdateLastActiveTime()
@@ -29,7 +31,7 @@ type Hook interface {
 // IConnManage 接口用于管理连接。
 type IConnManage interface {
 	AddConn(conn IConn) error
-	RemoveConn(conn IConn) error
+	RemoveConn(conn IConn, reason string) error
 	FindConn(id int32) (IConn, error)
 	CheckHealths() error
 	SetHook(Hook)
