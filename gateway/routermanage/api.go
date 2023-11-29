@@ -1,7 +1,7 @@
 package routermanage
 
 import (
-	"ggbond/store"
+	"github.com/chen102/ggbond/store"
 )
 
 type RouterHandle func([]byte) error

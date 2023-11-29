@@ -3,12 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"ggbond/message"
 	"io"
 	"net"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/chen102/ggbond/message"
 )
 
 func main() {

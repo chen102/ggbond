@@ -1,11 +1,12 @@
 package connmanage
 
 import (
-	"ggbond/message"
 	"io"
 	"log"
 	"net"
 	"time"
+
+	"github.com/chen102/ggbond/message"
 )
 
 type TCPConn struct {

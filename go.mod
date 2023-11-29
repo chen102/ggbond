@@ -1,4 +1,4 @@
-module ggbond
+module github.com/chen102/ggbond
 
 go 1.18
 

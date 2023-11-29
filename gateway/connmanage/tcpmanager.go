@@ -3,8 +3,9 @@ package connmanage
 import (
 	"errors"
 	"fmt"
-	"ggbond/store"
 	"log"
+
+	"github.com/chen102/ggbond/store"
 )
 
 var ErrorTCPManager error = errors.New("tcp connmanager error")

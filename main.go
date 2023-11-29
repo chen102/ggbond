@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"ggbond/gateway/connmanage"
-	"ggbond/gateway/routermanage"
-	"ggbond/gateway/server"
-	"ggbond/message"
-	"ggbond/store"
 	"log"
 	"time"
+
+	"github.com/chen102/ggbond/gateway/connmanage"
+	"github.com/chen102/ggbond/gateway/routermanage"
+	"github.com/chen102/ggbond/gateway/server"
+	"github.com/chen102/ggbond/message"
+	"github.com/chen102/ggbond/store"
 )
 
 type Hook struct {

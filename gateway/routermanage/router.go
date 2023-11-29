@@ -3,7 +3,8 @@ package routermanage
 import (
 	"errors"
 	"fmt"
-	"ggbond/store"
+
+	"github.com/chen102/ggbond/store"
 )
 
 var ErrorRouterManager error = errors.New("router manager error")

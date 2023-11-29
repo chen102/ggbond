@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"ggbond/gateway/connmanage"
-	"ggbond/gateway/routermanage"
 	"io"
 	"log"
 	"math"
 	"net"
 	"sync"
 
-	"ggbond/message"
+	"github.com/chen102/ggbond/gateway/connmanage"
+	"github.com/chen102/ggbond/gateway/routermanage"
+
+	"github.com/chen102/ggbond/message"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/spaolacci/murmur3"

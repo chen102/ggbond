@@ -1,10 +1,11 @@
 package connmanage
 
 import (
-	"ggbond/message"
-	"ggbond/store"
 	"io"
 	"net"
+
+	"github.com/chen102/ggbond/message"
+	"github.com/chen102/ggbond/store"
 )
 
 // IConn 接口定义了连接的基本操作。
