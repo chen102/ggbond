@@ -89,11 +89,11 @@ func (s *TCPServer) handle(tcpconn net.Conn) error {
 		case <-s.stopChannel:
 			cancel()
 			wg.Wait()
-			return s.connManager.RemoveConn(conn, "server stop")
+			return s.connManager.RemoveConn(conn, errors.New("server stop"))
 		case err := <-conn.WaitForClosed(): //读写协程出错，或者正常关闭
 			cancel()
 			wg.Wait()
-			return s.connManager.RemoveConn(conn, err.Error())
+			return s.connManager.RemoveConn(conn, err)
 		}
 	}
 

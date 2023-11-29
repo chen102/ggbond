@@ -32,12 +32,12 @@ func (m *TCPConnManager) AddConn(conn IConn) error {
 	return nil
 }
 
-func (m *TCPConnManager) RemoveConn(conn IConn, reason string) error {
+func (m *TCPConnManager) RemoveConn(conn IConn, err error) error {
 	if err := m.Del(conn.GetConnID()); err != nil {
 		return fmt.Errorf("%w: %s", ErrorTCPManager, err)
 	}
 	m.TCPNums--
-	return conn.Close(errors.New(reason))
+	return conn.Close(err)
 }
 
 func (m *TCPConnManager) FindConn(connID int32) (IConn, error) {
@@ -58,7 +58,7 @@ func (m *TCPConnManager) CheckHealths() error {
 		log.Println("check health:", id)
 		if !conn.CheckHealth() {
 			log.Println("check health:", id, "failed")
-			if err := m.RemoveConn(conn, "conn time out"); err != nil {
+			if err := m.RemoveConn(conn, errors.New("conn time out")); err != nil {
 				log.Println("remove conn:", id, "failed")
 			}
 			m.Del(key.(int32))

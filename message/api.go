@@ -12,6 +12,7 @@ type IMessage interface {
 	GetRouteID() int32
 	GetLength() int32
 	Write(body []byte, messageID int32, routeID int32) error
+	Reset() //重置，复用消息
 }
 
 func NewMessage(messagetype string) IMessage {

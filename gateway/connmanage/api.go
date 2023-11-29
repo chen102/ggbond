@@ -31,7 +31,7 @@ type Hook interface {
 // IConnManage 接口用于管理连接。
 type IConnManage interface {
 	AddConn(conn IConn) error
-	RemoveConn(conn IConn, reason string) error
+	RemoveConn(conn IConn, err error) error
 	FindConn(id int32) (IConn, error)
 	CheckHealths() error
 	SetHook(Hook)

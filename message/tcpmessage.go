@@ -92,3 +92,9 @@ func (m *TCPMessage) Write(body []byte, messageID int32, routeID int32) error {
 	m.length = int32(len(body))
 	return nil
 }
+func (m *TCPMessage) Reset() {
+	m.body = nil
+	m.messageID = 0
+	m.routeID = 0
+	m.length = 0
+}
