@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"math"
@@ -24,28 +25,71 @@ type TCPServer struct {
 	listener    net.Listener
 	router      routermanage.IRouterManage
 	stopChannel chan struct{}
+	ip          string
+	port        int64
+	servername  string
 }
 
 var _ IServer = (*TCPServer)(nil)
 
-func NewTCPServer(connManager connmanage.IConnManage, router routermanage.IRouterManage) *TCPServer {
+// NewTCPServer 创建一个tcp服务器
+//IConnManage:连接管理器实例，IRouterManage:路由管理实例 ,ServerOption:服务器选项
+func NewTCPServer(connManager connmanage.IConnManage, router routermanage.IRouterManage, opt ...ServerOption) *TCPServer {
+
+	var options serveroptions
+	for _, o := range opt {
+		if err := o(&options); err != nil {
+			panic(fmt.Errorf("apply option error:%w", err))
+		}
+	}
+	var (
+		ip, servername string = "127.0.0.1", "server001"
+		port           int64  = 8080
+	)
+
+	if options.ip != nil {
+		//验证ip是否合法
+		if net.ParseIP(*options.ip) == nil {
+			panic("ip is not valid")
+		}
+		ip = *options.ip
+	}
+	if options.port != nil {
+		if *options.port < 0 || *options.port > 65535 {
+			panic("port is not valid")
+		}
+		port = *options.port
+	}
+	if options.servername != nil {
+		if *options.servername == "" {
+			panic("servername is not valid")
+		}
+		servername = *options.servername
+	}
+
 	return &TCPServer{
 		connManager: connManager,
 		router:      router,
 		stopChannel: make(chan struct{}),
+		ip:          ip,
+		port:        port,
+		servername:  servername,
 	}
 }
 
+//启动服务
 func (s *TCPServer) Start() error {
 	var err error
-	s.listener, err = net.Listen("tcp", ":8080")
+	s.listener, err = net.Listen("tcp", fmt.Sprintf("%s:%d", s.ip, s.port))
 	if err != nil {
 		return err
 	}
-	log.Println("TCP server started on :8080")
+	log.Println("TCP server started on " + fmt.Sprintf("%s:%d", s.ip, s.port))
 	go s.acceptConnections()
 	return nil
 }
+
+//停止服务
 func (s *TCPServer) Stop() error {
 	close(s.stopChannel)
 	if err := s.listener.Close(); err != nil {
@@ -80,10 +124,21 @@ func (s *TCPServer) handle(tcpconn net.Conn) error {
 		}
 	}
 	if err := s.connManager.AddConn(conn); err != nil {
+		tcpconn.Close()
 		return err
 	}
 	go s.tcpreader(ctx, &wg, conn)
 	go tcpwrite(ctx, &wg, conn)
+	if s.connManager.GetHook() != nil {
+		if err := s.connManager.GetHook().AfterConn(conn); err != nil {
+			return err
+		}
+	}
+	defer func() {
+		if s.connManager.GetHook() != nil {
+			s.connManager.GetHook().CloseConn(conn)
+		}
+	}()
 	for {
 		select {
 		case <-s.stopChannel:
@@ -98,6 +153,8 @@ func (s *TCPServer) handle(tcpconn net.Conn) error {
 	}
 
 }
+
+//生成UUIDV4的murmur3算法int32 hash值
 func GenerateConnID() int32 {
 	//UUIDV4 HASH
 	hasher := murmur3.New32()
@@ -115,7 +172,7 @@ func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn conn
 			log.Printf("conn %d tcpreader done", conn.GetConnID())
 			return
 		default:
-			if !conn.CheckHealth() {
+			if !conn.CheckHealth(s.connManager.GetOutTimeOption("detectionTimeout")) {
 				log.Printf("conn %d tcpreader done", conn.GetConnID())
 				conn.SignalClose(errors.New("conn time out"))
 				return
