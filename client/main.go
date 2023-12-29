@@ -28,21 +28,25 @@ func main() {
 		os.Exit(1)
 	}()
 	//获取命令行
-	name := os.Args[1]
 	var id int32
-	SendMsg(conn, 1, id, []byte(name))
-
 	go func() {
-		for {
+		for id < 10 {
 			select {
-			case <-time.After(time.Microsecond * 1000):
+			case <-time.After(time.Microsecond * 1000000):
 				id++
-				SendMsg(conn, 2, id, []byte(name+"hello"))
+				SendMsg(conn, 1, id, nil)
 			}
 		}
+		SendMsg(conn, 10, 1000, nil)
 	}()
+
 	for {
-		fmt.Println(string(RevMsg(conn).GetBody()))
+		msg := RevMsg(conn)
+		if string(msg.GetBody()) == "ok" {
+			break
+		}
+		fmt.Println(string(msg.GetBody()))
+
 	}
 
 }

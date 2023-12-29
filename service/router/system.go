@@ -45,6 +45,7 @@ func (b *SystemService) Ping() routermanage.RouterHandle {
 		if err := conn.SendMessage(msg); err != nil {
 			return fmt.Errorf("PING Router Error:%w,RouterId:%d", err, PING)
 		}
+		conn.UpdateLastActiveTime()
 		return nil
 	}
 }
@@ -55,7 +56,7 @@ func (b *SystemService) ActiveShutdown() routermanage.RouterHandle {
 			return fmt.Errorf("ActiveShutdown Router Error:%w,RouterId:%d", err, ACTIVESHUTDOWN)
 		}
 		msg := connect.NewMessage("tcp")
-		if err := msg.Write([]byte(strconv.Itoa(int(msgid))), server.GenerateConnID(), ACTIVESHUTDOWN); err != nil {
+		if err := msg.Write([]byte("ok"), server.GenerateConnID(), ACTIVESHUTDOWN); err != nil {
 			return fmt.Errorf("ActiveShutdown Router Error:%w,RouterId:%d", err, ACTIVESHUTDOWN)
 		}
 		if err := conn.SendMessage(msg); err != nil {

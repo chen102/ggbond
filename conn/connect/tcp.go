@@ -65,6 +65,7 @@ func (c *TCPConn) CheckHealth(timeout int64) bool {
 
 //关闭连接
 func (c *TCPConn) Close(err error) error {
+	log.Println("连接关闭:", c.connID)
 	return c.conn.Close()
 }
 

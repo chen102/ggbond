@@ -179,15 +179,15 @@ func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn conn
 				return
 			}
 			log.Println("read from conn:", string(msg.GetBody()), msg.GetMessageID())
-			switch msg.GetRouteID() {
-			case 1:
-				conn.UpdateLastActiveTime()
-				continue
-			case 9:
-				log.Printf("user %s logout", string(msg.GetBody()))
-				conn.SignalClose(nil)
-				return
-			}
+			// switch msg.GetRouteID() {
+			// case 1:
+			// 	conn.UpdateLastActiveTime()
+			// 	continue
+			// case 9:
+			// 	log.Printf("user %s logout", string(msg.GetBody()))
+			// 	conn.SignalClose(nil)
+			// 	return
+			// }
 			if err := s.router.HandleMessage(msg.GetRouteID(), conn.GetConnID(), msg.GetMessageID(), msg.GetBody()); err != nil {
 				log.Println("route error:", err, "msg:", msg)
 			}
