@@ -1,7 +1,9 @@
-package message
+package connect
 
 import (
 	"io"
+
+	"github.com/chen102/ggbond/message"
 )
 
 type IMessage interface {
@@ -12,13 +14,12 @@ type IMessage interface {
 	GetRouteID() int32
 	GetLength() int32
 	Write(body []byte, messageID int32, routeID int32) error
-	Reset() //重置，复用消息
 }
 
 func NewMessage(messagetype string) IMessage {
 	switch messagetype {
 	case "tcp":
-		return &TCPMessage{}
+		return &message.TCPMessage{}
 	}
 	return nil
 }

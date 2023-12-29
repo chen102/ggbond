@@ -14,8 +14,6 @@ type SyncMapStore struct {
 	sync.Map
 }
 
-var _ IStore = (*SyncMapStore)(nil)
-
 func NewSyncMapStore() *SyncMapStore {
 	return &SyncMapStore{}
 }

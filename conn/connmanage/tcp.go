@@ -8,13 +8,13 @@ import (
 	"math"
 	"time"
 
-	"github.com/chen102/ggbond/store"
+	"github.com/chen102/ggbond/conn/store"
 )
 
 var ErrorTCPManager error = errors.New("tcp connmanager error")
 
 type TCPConnManager struct {
-	store.IStore
+	store.ITCPStore
 	hook                Hook
 	tcpnums             int32
 	maximumConnection   int32 //最大连接数
@@ -24,13 +24,11 @@ type TCPConnManager struct {
 	detectionTimeout    int64 //探测超时时间 每个连接探测超时时间，用次参数来监控连接是否正常
 }
 
-var _ IConnManage = (*TCPConnManager)(nil)
-
 // NewTCPConnManager 创建一个tcp连接管理器
-// IStore:存储器实例,Hook:钩子函数,connManageroptions:连接管理器选项
-func NewTCPConnManager(v store.IStore, h Hook, opt ...ConnManagerOption) *TCPConnManager {
+// ITCPStore:存储器实例,Hook:钩子函数,connManageroptions:连接管理器选项
+func NewTCPConnManager(v store.ITCPStore, h Hook, opt ...ConnManagerOption) *TCPConnManager {
 	m := &TCPConnManager{}
-	m.IStore = v
+	m.ITCPStore = v
 	m.hook = h
 	if err := m.setoption(opt...); err != nil {
 		panic(fmt.Errorf("%w:%w", ErrorTCPManager, err))
@@ -39,8 +37,8 @@ func NewTCPConnManager(v store.IStore, h Hook, opt ...ConnManagerOption) *TCPCon
 }
 
 // AddConn 添加一个连接
-//IConn :连接实例
-func (m *TCPConnManager) AddConn(conn IConn) error {
+//ITCPConn :连接实例
+func (m *TCPConnManager) AddConn(conn ITCPConn) error {
 	if m.maximumConnection > 0 && m.tcpnums >= m.maximumConnection {
 		return fmt.Errorf("%w: %s", ErrorTCPManager, "maximum connection")
 	}
@@ -54,8 +52,8 @@ func (m *TCPConnManager) AddConn(conn IConn) error {
 }
 
 // RemoveConn 移除一个连接
-//IConn :连接实例
-func (m *TCPConnManager) RemoveConn(conn IConn, err error) error {
+//ITCPConn :连接实例
+func (m *TCPConnManager) RemoveConn(conn ITCPConn, err error) error {
 	if err := m.Del(conn.GetConnID()); err != nil {
 		return fmt.Errorf("%w: %s", ErrorTCPManager, err)
 	}
@@ -65,16 +63,16 @@ func (m *TCPConnManager) RemoveConn(conn IConn, err error) error {
 
 // FindConn 查找一个连接
 //connID 连接ID
-func (m *TCPConnManager) FindConn(connID int32) (IConn, error) {
+func (m *TCPConnManager) FindConn(connID int32) (ITCPConn, error) {
 	conn, err := m.Get(connID)
 	if err != nil {
 		return nil, err
 	}
-	tcpConn, ok := conn.(IConn)
+	store, ok := conn.(ITCPConn)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrorTCPManager, "connection is not a TCP connection")
 	}
-	return tcpConn, nil
+	return store, nil
 }
 
 //健康检查
@@ -85,7 +83,7 @@ func (m *TCPConnManager) CheckHealths(ctx context.Context) {
 			select {
 			case <-time.After(time.Second * time.Duration(m.explorationCycle)):
 				m.RangeStroe(func(key, value interface{}) bool {
-					conn := value.(IConn)
+					conn := value.(ITCPConn)
 					id := conn.GetConnID()
 					log.Println("check health:", id)
 					if !conn.CheckHealth(m.detectionTimeout) {
@@ -132,10 +130,10 @@ func (m *TCPConnManager) GetOutTimeOption(name string) int64 {
 }
 
 //GetAllConn 获取所有连接
-func (c *TCPConnManager) GetAllConn() map[int32]IConn {
-	conns := make(map[int32]IConn, c.tcpnums)
+func (c *TCPConnManager) GetAllConn() map[int32]ITCPConn {
+	conns := make(map[int32]ITCPConn, c.tcpnums)
 	c.RangeStroe(func(key, value interface{}) bool {
-		conn := value.(IConn)
+		conn := value.(ITCPConn)
 		conns[key.(int32)] = conn
 		return true
 	})

@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/chen102/ggbond/message"
+	"github.com/chen102/ggbond/conn/connect"
 )
 
 func main() {
@@ -47,12 +47,12 @@ func main() {
 
 }
 func SendMsg(conn net.Conn, routeID, msgID int32, body []byte) error {
-	msg := message.NewMessage("tcp")
+	msg := connect.NewMessage("tcp")
 	msg.Write(body, msgID, routeID)
 	return msg.PackAndWrite(conn)
 }
-func RevMsg(conn net.Conn) message.IMessage {
-	msg := message.NewMessage("tcp")
+func RevMsg(conn net.Conn) connect.IMessage {
+	msg := connect.NewMessage("tcp")
 	if err := msg.ReadAndUnpack(conn); errors.Is(err, io.EOF) {
 		panic(err)
 	}

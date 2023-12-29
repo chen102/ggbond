@@ -1,7 +1,8 @@
 package store
 
-// IStore 接口定义了基本的数据存储功能。
-type IStore interface {
+import "github.com/chen102/ggbond/store"
+
+type ITCPStore interface {
 	Get(key int32) (interface{}, error)
 	Set(key int32, value interface{}) (int32, error)
 	Del(key int32) error
@@ -9,10 +10,6 @@ type IStore interface {
 	RangeStroe(f func(key, value interface{}) bool)
 }
 
-func NewStoe(name string) IStore {
-	switch name {
-	case SYNCMAPSTORE:
-		return NewSyncMapStore()
-	}
-	return nil
+func NewTCPSyncMapStore() ITCPStore {
+	return store.NewSyncMapStore()
 }

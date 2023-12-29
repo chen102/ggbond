@@ -16,8 +16,6 @@ type TCPMessage struct {
 	length    int32
 }
 
-var _ IMessage = (*TCPMessage)(nil)
-
 func (m *TCPMessage) PackAndWrite(w io.Writer) error {
 	if err := m.pack(w); err != nil {
 		return err
@@ -91,10 +89,4 @@ func (m *TCPMessage) Write(body []byte, messageID int32, routeID int32) error {
 	m.routeID = routeID
 	m.length = int32(len(body))
 	return nil
-}
-func (m *TCPMessage) Reset() {
-	m.body = nil
-	m.messageID = 0
-	m.routeID = 0
-	m.length = 0
 }

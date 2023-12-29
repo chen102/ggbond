@@ -1,12 +1,10 @@
-package connmanage
+package connect
 
 import (
 	"io"
 	"log"
 	"net"
 	"time"
-
-	"github.com/chen102/ggbond/message"
 )
 
 type TCPConn struct {
@@ -16,11 +14,9 @@ type TCPConn struct {
 	lastactivatetime int64
 	r                io.Reader
 	w                io.Writer
-	sendChan         chan message.IMessage
+	sendChan         chan IMessage
 	close            chan error
 }
-
-var _ IConn = (*TCPConn)(nil)
 
 //初始化一个TCP连接
 func NewTCPConn(conn net.Conn, connID int32, connType string) *TCPConn {
@@ -31,7 +27,7 @@ func NewTCPConn(conn net.Conn, connID int32, connType string) *TCPConn {
 		lastactivatetime: time.Now().Unix(),
 		r:                conn,
 		w:                conn,
-		sendChan:         make(chan message.IMessage, 100),
+		sendChan:         make(chan IMessage, 100),
 		close:            make(chan error),
 	}
 }
@@ -78,13 +74,13 @@ func (c *TCPConn) UpdateLastActiveTime() {
 }
 
 //发送消息
-func (c *TCPConn) SendMessage(msg message.IMessage) error {
+func (c *TCPConn) SendMessage(msg IMessage) error {
 	c.sendChan <- msg
 	return nil
 }
 
 //获取消息通道
-func (c *TCPConn) GetMessageChan() chan message.IMessage {
+func (c *TCPConn) GetMessageChan() chan IMessage {
 	return c.sendChan
 }
 

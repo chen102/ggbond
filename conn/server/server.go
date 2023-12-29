@@ -11,30 +11,25 @@ import (
 	"net"
 	"sync"
 
-	"github.com/chen102/ggbond/gateway/connmanage"
-	"github.com/chen102/ggbond/gateway/routermanage"
-
-	"github.com/chen102/ggbond/message"
-
+	"github.com/chen102/ggbond/conn/connect"
+	"github.com/chen102/ggbond/conn/connmanage"
 	uuid "github.com/satori/go.uuid"
 	"github.com/spaolacci/murmur3"
 )
 
 type TCPServer struct {
-	connManager connmanage.IConnManage
+	connManager ITCPConnManage
 	listener    net.Listener
-	router      routermanage.IRouterManage
+	router      IRouterManage
 	stopChannel chan struct{}
 	ip          string
 	port        int64
 	servername  string
 }
 
-var _ IServer = (*TCPServer)(nil)
-
 // NewTCPServer 创建一个tcp服务器
 //IConnManage:连接管理器实例，IRouterManage:路由管理实例 ,ServerOption:服务器选项
-func NewTCPServer(connManager connmanage.IConnManage, router routermanage.IRouterManage, opt ...ServerOption) *TCPServer {
+func NewTCPServer(connManager ITCPConnManage, router IRouterManage, opt ...ServerOption) *TCPServer {
 
 	var options serveroptions
 	for _, o := range opt {
@@ -161,7 +156,7 @@ func GenerateConnID() int32 {
 	_, _ = hasher.Write([]byte(uuid.NewV4().String()))
 	return int32(hasher.Sum32() % math.MaxInt32)
 }
-func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn connmanage.IConn) {
+func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn connmanage.ITCPConn) {
 	reader := bufio.NewReader(conn.GetReader())
 	wg.Add(1)
 	defer wg.Done()
@@ -177,7 +172,7 @@ func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn conn
 				conn.SignalClose(errors.New("conn time out"))
 				return
 			}
-			msg := message.NewMessage("tcp")
+			msg := connect.NewMessage("tcp")
 			if err := msg.ReadAndUnpack(reader); errors.Is(err, io.EOF) {
 				log.Printf("conn %d tcpreader done", conn.GetConnID())
 				conn.SignalClose(errors.New("read eof"))
@@ -193,14 +188,14 @@ func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn conn
 				conn.SignalClose(nil)
 				return
 			}
-			if err := s.router.HandleMessage(msg.GetRouteID(), msg.GetBody()); err != nil {
+			if err := s.router.HandleMessage(msg.GetRouteID(), conn.GetConnID(), msg.GetMessageID(), msg.GetBody()); err != nil {
 				log.Println("route error:", err, "msg:", msg)
 			}
 
 		}
 	}
 }
-func tcpwrite(ctx context.Context, wg *sync.WaitGroup, conn connmanage.IConn) {
+func tcpwrite(ctx context.Context, wg *sync.WaitGroup, conn connmanage.ITCPConn) {
 	writer := bufio.NewWriter(conn.GetSender())
 	wg.Add(1)
 	defer wg.Done()
