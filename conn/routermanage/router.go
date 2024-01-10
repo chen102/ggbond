@@ -14,7 +14,7 @@ type RouterManager struct {
 }
 type RouterHandle func(msgid, connid int32, parameter []byte) error
 
-func NewTCPRouterManager(store store.ITCPStore) *RouterManager {
+func NewTCPRouter(store store.ITCPStore) *RouterManager {
 	return &RouterManager{
 		store,
 	}

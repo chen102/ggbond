@@ -1,26 +1,24 @@
-package connmanage
+package connect
 
 import (
 	"io"
 	"net"
-
-	"github.com/chen102/ggbond/conn/connect"
 )
 
 // ITCPConn 接口定义了连接的基本操作。
 type ITCPConn interface {
-	GetConnType() (string, error)
-	GetConnID() int32
-	GetConn() (interface{}, error)
+	ConnType() (string, error)
+	ConnID() int32
+	Conn() (interface{}, error)
 	CheckHealth(timeout int64) bool
 	Close(err error) error
 	WaitForClosed() chan error
 	SignalClose(err error)
-	GetSender() io.Writer
-	GetReader() io.Reader
+	Sender() io.Writer
+	Reader() io.Reader
 	UpdateLastActiveTime()
-	SendMessage(connect.IMessage) error
-	GetMessageChan() chan connect.IMessage
+	SendMessage(IMessage) error
+	MessageChan() chan IMessage
 }
 
 type Hook interface {
@@ -30,10 +28,12 @@ type Hook interface {
 }
 
 // NewConn 创建一个新的连接。
-func NewConn(conn net.Conn, connID int32, conntype string) ITCPConn {
+func NewConn(conn interface{}, connID int32, conntype string) ITCPConn {
 	switch conntype {
 	case "tcp":
-		return connect.NewTCPConn(conn, connID, conntype)
+		return NewTCPConn(conn.(net.Conn), connID, conntype)
+	case "atcp":
+		return NewAsyncTcpConn(conn.(int), connID, conntype)
 	}
 	return nil
 }

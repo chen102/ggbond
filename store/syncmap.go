@@ -14,7 +14,7 @@ type SyncMapStore struct {
 	sync.Map
 }
 
-func NewSyncMapStore() *SyncMapStore {
+func NewSyncMap() *SyncMapStore {
 	return &SyncMapStore{}
 }
 func (s *SyncMapStore) Get(key int32) (interface{}, error) {

@@ -21,11 +21,13 @@ type IServer interface {
 func main() {
 
 	var (
-		connmanager   server.ITCPConnManage = server.NewConnManage("tcp", store.NewTCPSyncMapStore(), &hook.Hook{})
-		routermanager server.IRouterManage  = server.NewRouterManage("router", store.NewTCPSyncMapStore())
-		connsvc       IServer               = server.NewTCPServer(connmanager, routermanager)
-		systemsvc     RouterInstance        = router.NewSystemService(connmanager)
+		connmanager   server.ITCPConnManage   = server.NewConnManage("tcp", store.NewTCPSyncMap(), &hook.ConnHook{})
+		groupmanager  server.IConnGroupMagage = server.NewConnGroup()
+		routermanager server.IRouterManage    = server.NewRouterManage("router", store.NewTCPSyncMap())
+		connsvc       IServer                 = server.NewTCPServer(connmanager, routermanager)
+		systemsvc     RouterInstance          = router.NewSystemService(connmanager)
 	)
+	groupmanager.AddGroup(&hook.Room{})
 	for id, handle := range systemsvc.Handles() {
 		routermanager.RegisterRoute(id, handle)
 	}

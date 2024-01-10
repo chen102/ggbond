@@ -68,19 +68,19 @@ func (m *TCPMessage) pack(w io.Writer) error {
 	return nil
 }
 
-func (m *TCPMessage) GetBody() []byte {
+func (m *TCPMessage) Body() []byte {
 	return m.body
 }
 
-func (m *TCPMessage) GetMessageID() int32 {
+func (m *TCPMessage) MessageID() int32 {
 	return m.messageID
 }
 
-func (m *TCPMessage) GetRouteID() int32 {
+func (m *TCPMessage) RouteID() int32 {
 	return m.routeID
 }
 
-func (m *TCPMessage) GetLength() int32 {
+func (m *TCPMessage) Length() int32 {
 	return m.length
 }
 func (m *TCPMessage) Write(body []byte, messageID int32, routeID int32) error {

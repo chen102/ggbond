@@ -3,21 +3,21 @@ package hook
 import (
 	"fmt"
 
-	"github.com/chen102/ggbond/conn/connmanage"
+	"github.com/chen102/ggbond/conn/connect"
 )
 
-type Hook struct {
+type ConnHook struct {
 }
 
-func (c *Hook) BeforConn(conn connmanage.ITCPConn) error {
+func (c *ConnHook) BeforConn(conn connect.ITCPConn) error {
 	fmt.Println("正在连接")
 	return nil
 }
-func (c *Hook) AfterConn(conn connmanage.ITCPConn) error {
+func (c *ConnHook) AfterConn(conn connect.ITCPConn) error {
 	fmt.Println("连接成功")
 	return nil
 }
-func (c *Hook) CloseConn(conn connmanage.ITCPConn) error {
+func (c *ConnHook) CloseConn(conn connect.ITCPConn) error {
 	fmt.Println("关闭连接")
 	return nil
 }

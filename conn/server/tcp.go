@@ -12,13 +12,13 @@ import (
 	"sync"
 
 	"github.com/chen102/ggbond/conn/connect"
-	"github.com/chen102/ggbond/conn/connmanage"
 	uuid "github.com/satori/go.uuid"
 	"github.com/spaolacci/murmur3"
 )
 
 type TCPServer struct {
 	connManager ITCPConnManage
+	group       IConnGroupMagage
 	listener    net.Listener
 	router      IRouterManage
 	stopChannel chan struct{}
@@ -64,6 +64,7 @@ func NewTCPServer(connManager ITCPConnManage, router IRouterManage, opt ...Serve
 
 	return &TCPServer{
 		connManager: connManager,
+		group:       NewConnGroup(),
 		router:      router,
 		stopChannel: make(chan struct{}),
 		ip:          ip,
@@ -111,10 +112,10 @@ func (s *TCPServer) acceptConnections() {
 func (s *TCPServer) handle(tcpconn net.Conn) error {
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
-	conn := connmanage.NewConn(tcpconn, GenerateConnID(), "tcp")
+	conn := connect.NewConn(tcpconn, GenerateConnID(), "tcp")
 	//连接前的OOK
-	if s.connManager.GetHook() != nil {
-		if err := s.connManager.GetHook().BeforConn(conn); err != nil {
+	if s.connManager.Hook() != nil {
+		if err := s.connManager.Hook().BeforConn(conn); err != nil {
 			return err
 		}
 	}
@@ -124,14 +125,14 @@ func (s *TCPServer) handle(tcpconn net.Conn) error {
 	}
 	go s.tcpreader(ctx, &wg, conn)
 	go tcpwrite(ctx, &wg, conn)
-	if s.connManager.GetHook() != nil {
-		if err := s.connManager.GetHook().AfterConn(conn); err != nil {
+	if s.connManager.Hook() != nil {
+		if err := s.connManager.Hook().AfterConn(conn); err != nil {
 			return err
 		}
 	}
 	defer func() {
-		if s.connManager.GetHook() != nil {
-			s.connManager.GetHook().CloseConn(conn)
+		if s.connManager.Hook() != nil {
+			s.connManager.Hook().CloseConn(conn)
 		}
 	}()
 	for {
@@ -156,29 +157,29 @@ func GenerateConnID() int32 {
 	_, _ = hasher.Write([]byte(uuid.NewV4().String()))
 	return int32(hasher.Sum32() % math.MaxInt32)
 }
-func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn connmanage.ITCPConn) {
-	reader := bufio.NewReader(conn.GetReader())
+func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn connect.ITCPConn) {
+	reader := bufio.NewReader(conn.Reader())
 	wg.Add(1)
 	defer wg.Done()
-	log.Printf("conn %d tcpreader start...", conn.GetConnID())
+	log.Printf("conn %d tcpreader start...", conn.ConnID())
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("conn %d tcpreader done", conn.GetConnID())
+			log.Printf("conn %d tcpreader done", conn.ConnID())
 			return
 		default:
-			if !conn.CheckHealth(s.connManager.GetOutTimeOption("detectionTimeout")) {
-				log.Printf("conn %d tcpreader done", conn.GetConnID())
+			if !conn.CheckHealth(s.connManager.OutTimeOption("detectionTimeout")) {
+				log.Printf("conn %d tcpreader done", conn.ConnID())
 				conn.SignalClose(errors.New("conn time out"))
 				return
 			}
 			msg := connect.NewMessage("tcp")
 			if err := msg.ReadAndUnpack(reader); errors.Is(err, io.EOF) {
-				log.Printf("conn %d tcpreader done", conn.GetConnID())
+				log.Printf("conn %d tcpreader done", conn.ConnID())
 				conn.SignalClose(errors.New("read eof"))
 				return
 			}
-			log.Println("read from conn:", string(msg.GetBody()), msg.GetMessageID())
+			log.Println("read from conn:", string(msg.Body()), msg.MessageID())
 			// switch msg.GetRouteID() {
 			// case 1:
 			// 	conn.UpdateLastActiveTime()
@@ -188,27 +189,27 @@ func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn conn
 			// 	conn.SignalClose(nil)
 			// 	return
 			// }
-			if err := s.router.HandleMessage(msg.GetRouteID(), conn.GetConnID(), msg.GetMessageID(), msg.GetBody()); err != nil {
+			if err := s.router.HandleMessage(msg.RouteID(), conn.ConnID(), msg.MessageID(), msg.Body()); err != nil {
 				log.Println("route error:", err, "msg:", msg)
 			}
 
 		}
 	}
 }
-func tcpwrite(ctx context.Context, wg *sync.WaitGroup, conn connmanage.ITCPConn) {
-	writer := bufio.NewWriter(conn.GetSender())
+func tcpwrite(ctx context.Context, wg *sync.WaitGroup, conn connect.ITCPConn) {
+	writer := bufio.NewWriter(conn.Sender())
 	wg.Add(1)
 	defer wg.Done()
-	log.Printf("conn %d tcpwrite start...", conn.GetConnID())
+	log.Printf("conn %d tcpwrite start...", conn.ConnID())
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("conn %d tcpwrite done", conn.GetConnID())
+			log.Printf("conn %d tcpwrite done", conn.ConnID())
 			return
-		case msg := <-conn.GetMessageChan():
+		case msg := <-conn.MessageChan():
 			// log.Println("write to conn...")
 			if err := msg.PackAndWrite(writer); err != nil {
-				log.Printf("conn %d tcpwrite done", conn.GetConnID())
+				log.Printf("conn %d tcpwrite done", conn.ConnID())
 				conn.SignalClose(errors.New("write eof"))
 				return
 			}

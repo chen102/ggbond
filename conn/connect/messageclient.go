@@ -9,10 +9,10 @@ import (
 type IMessage interface {
 	PackAndWrite(w io.Writer) error
 	ReadAndUnpack(io.Reader) error
-	GetBody() []byte
-	GetMessageID() int32
-	GetRouteID() int32
-	GetLength() int32
+	Body() []byte
+	MessageID() int32
+	RouteID() int32
+	Length() int32
 	Write(body []byte, messageID int32, routeID int32) error
 }
 

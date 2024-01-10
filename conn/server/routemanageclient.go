@@ -13,7 +13,7 @@ type IRouterManage interface {
 func NewRouterManage(name string, store store.ITCPStore) IRouterManage {
 	switch name {
 	case "router":
-		return routermanage.NewTCPRouterManager(store)
+		return routermanage.NewTCPRouter(store)
 	}
 	return nil
 }

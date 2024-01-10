@@ -10,6 +10,6 @@ type ITCPStore interface {
 	RangeStroe(f func(key, value interface{}) bool)
 }
 
-func NewTCPSyncMapStore() ITCPStore {
-	return store.NewSyncMapStore()
+func NewTCPSyncMap() ITCPStore {
+	return store.NewSyncMap()
 }

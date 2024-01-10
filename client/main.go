@@ -42,10 +42,10 @@ func main() {
 
 	for {
 		msg := RevMsg(conn)
-		if string(msg.GetBody()) == "ok" {
+		if string(msg.Body()) == "ok" {
 			break
 		}
-		fmt.Println(string(msg.GetBody()))
+		fmt.Println(string(msg.Body()))
 
 	}
 
