@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/chen102/ggbond/conn/connect"
+	"github.com/chen102/ggbond/message"
 	uuid "github.com/satori/go.uuid"
 	"github.com/spaolacci/murmur3"
 )
@@ -25,10 +26,11 @@ type TCPServer struct {
 	ip          string
 	port        int64
 	servername  string
+	msgpool     *message.Pool
 }
 
 // NewTCPServer 创建一个tcp服务器
-//IConnManage:连接管理器实例，IRouterManage:路由管理实例 ,ServerOption:服务器选项
+// IConnManage:连接管理器实例，IRouterManage:路由管理实例 ,ServerOption:服务器选项
 func NewTCPServer(connManager ITCPConnManage, router IRouterManage, opt ...ServerOption) *TCPServer {
 
 	var options serveroptions
@@ -70,10 +72,11 @@ func NewTCPServer(connManager ITCPConnManage, router IRouterManage, opt ...Serve
 		ip:          ip,
 		port:        port,
 		servername:  servername,
+		msgpool:     message.NewPool("tcp"),
 	}
 }
 
-//启动服务
+// 启动服务
 func (s *TCPServer) Start() error {
 	var err error
 	s.listener, err = net.Listen("tcp", fmt.Sprintf("%s:%d", s.ip, s.port))
@@ -85,7 +88,7 @@ func (s *TCPServer) Start() error {
 	return nil
 }
 
-//停止服务
+// 停止服务
 func (s *TCPServer) Stop() error {
 	close(s.stopChannel)
 	if err := s.listener.Close(); err != nil {
@@ -150,7 +153,7 @@ func (s *TCPServer) handle(tcpconn net.Conn) error {
 
 }
 
-//生成UUIDV4的murmur3算法int32 hash值
+// 生成UUIDV4的murmur3算法int32 hash值
 func GenerateConnID() int32 {
 	//UUIDV4 HASH
 	hasher := murmur3.New32()
@@ -173,7 +176,12 @@ func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn conn
 				conn.SignalClose(errors.New("conn time out"))
 				return
 			}
-			msg := connect.NewMessage("tcp")
+			msg, err := s.msgpool.Get("tcp")
+			if err != nil {
+				log.Printf("conn %d tcpreader done", conn.ConnID())
+				conn.SignalClose(fmt.Errorf("get msg err:%w", err))
+				return
+			}
 			if err := msg.ReadAndUnpack(reader); errors.Is(err, io.EOF) {
 				log.Printf("conn %d tcpreader done", conn.ConnID())
 				conn.SignalClose(errors.New("read eof"))
@@ -192,7 +200,11 @@ func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn conn
 			if err := s.router.HandleMessage(msg.RouteID(), conn.ConnID(), msg.MessageID(), msg.Body()); err != nil {
 				log.Println("route error:", err, "msg:", msg)
 			}
-
+			if err := s.msgpool.Put("tcp", msg); err != nil {
+				log.Printf("conn %d tcpreader done", conn.ConnID())
+				conn.SignalClose(fmt.Errorf("put msg err:%w", err))
+				return
+			}
 		}
 	}
 }

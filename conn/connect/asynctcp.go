@@ -60,3 +60,9 @@ func (t *AsyncTcpConn) SendMessage(msg IMessage) error {
 func (t *AsyncTcpConn) MessageChan() chan IMessage {
 	return t.sendChan
 }
+func (t *AsyncTcpConn) Stat() ConnStat {
+	return ACTIVE
+}
+func (c *AsyncTcpConn) SetStat(stat ConnStat) {
+	return
+}
