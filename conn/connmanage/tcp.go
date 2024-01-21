@@ -38,7 +38,7 @@ func NewTCPConn(v store.ITCPStore, h connect.Hook, opt ...ConnManagerOption) *TC
 }
 
 // AddConn 添加一个连接
-//ITCPConn :连接实例
+// ITCPConn :连接实例
 func (m *TCPConnManager) AddConn(conn connect.ITCPConn) error {
 	if m.maximumConnection > 0 && m.tcpnums >= m.maximumConnection {
 		return fmt.Errorf("%w: %s", ErrorTCPManager, "maximum connection")
@@ -53,7 +53,7 @@ func (m *TCPConnManager) AddConn(conn connect.ITCPConn) error {
 }
 
 // RemoveConn 移除一个连接
-//ITCPConn :连接实例
+// ITCPConn :连接实例
 func (m *TCPConnManager) RemoveConn(conn connect.ITCPConn, err error) error {
 	if err := m.Del(conn.ConnID()); err != nil {
 		return fmt.Errorf("%w: %s", ErrorTCPManager, err)
@@ -63,7 +63,7 @@ func (m *TCPConnManager) RemoveConn(conn connect.ITCPConn, err error) error {
 }
 
 // FindConn 查找一个连接
-//connID 连接ID
+// connID 连接ID
 func (m *TCPConnManager) FindConn(connID int32) (connect.ITCPConn, error) {
 	conn, err := m.Get(connID)
 	if err != nil {
@@ -76,7 +76,9 @@ func (m *TCPConnManager) FindConn(connID int32) (connect.ITCPConn, error) {
 	return store, nil
 }
 
-//健康检查
+// 健康检查
+// 防止客户端因为网络原因管理器误删除连接:
+// 连接共有三张状态 活动:2 超时:1 关闭：0 单个连接，检查失败，依次递减直到状态为-1 连接管理器删除连接
 func (m *TCPConnManager) CheckHealths(ctx context.Context) {
 	close := make(chan struct{})
 	go func() {
@@ -87,13 +89,22 @@ func (m *TCPConnManager) CheckHealths(ctx context.Context) {
 					conn := value.(connect.ITCPConn)
 					id := conn.ConnID()
 					log.Println("check health:", id)
-					if !conn.CheckHealth(m.detectionTimeout) {
+					stat := conn.Stat()
+					if stat < 0 {
 						log.Println("check health:", id, "failed")
 						if err := m.RemoveConn(conn, errors.New("conn time out")); err != nil {
 							log.Println("remove conn:", id, "failed")
 						}
 						m.Del(key.(int32))
 						log.Println("remove conn:", id, "success")
+						return true
+					}
+					if !conn.CheckHealth(m.detectionTimeout) {
+						conn.SetStat(stat - 1)
+						return true
+					}
+					if stat < connect.ACTIVE {
+						conn.SetStat(stat + 1)
 					}
 					return true
 				})
@@ -130,7 +141,7 @@ func (m *TCPConnManager) OutTimeOption(name string) int64 {
 	return 0
 }
 
-//GetAllConn 获取所有连接
+// GetAllConn 获取所有连接
 func (c *TCPConnManager) AllConn() map[int32]connect.ITCPConn {
 	conns := make(map[int32]connect.ITCPConn, c.tcpnums)
 	c.RangeStroe(func(key, value interface{}) bool {

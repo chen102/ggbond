@@ -24,7 +24,7 @@ func main() {
 		connmanager   server.ITCPConnManage   = server.NewConnManage("tcp", store.NewTCPSyncMap(), &hook.ConnHook{})
 		groupmanager  server.IConnGroupMagage = server.NewConnGroup()
 		routermanager server.IRouterManage    = server.NewRouterManage("router", store.NewTCPSyncMap())
-		connsvc       IServer                 = server.NewTCPServer(connmanager, routermanager)
+		connsvc       IServer                 = server.NewTCPServer(connmanager, routermanager, server.WithPort(8089))
 		systemsvc     RouterInstance          = router.NewSystemService(connmanager)
 	)
 	groupmanager.AddGroup(&hook.Room{})

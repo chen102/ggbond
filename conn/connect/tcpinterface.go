@@ -19,6 +19,8 @@ type ITCPConn interface {
 	UpdateLastActiveTime()
 	SendMessage(IMessage) error
 	MessageChan() chan IMessage
+	Stat() ConnStat
+	SetStat(ConnStat)
 }
 
 type Hook interface {

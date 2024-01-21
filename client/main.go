@@ -15,7 +15,7 @@ import (
 func main() {
 
 	//tcp连接8080
-	conn, err := net.Dial("tcp", ":8080")
+	conn, err := net.Dial("tcp", ":8089")
 	if err != nil {
 		panic(err)
 	}
