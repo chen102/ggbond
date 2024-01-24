@@ -2,7 +2,9 @@ package message
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
+	"math"
 )
 
 const headerSize = 12 // 数据包长度、路由id、消息id各4字节
@@ -90,6 +92,9 @@ func (m *TCPMessage) Length() int32 {
 	return m.length
 }
 func (m *TCPMessage) Write(body []byte, messageID int32, routeID int32) error {
+	if len(body) > math.MaxInt32 {
+		return errors.New("message body too long")
+	}
 	m.body = body
 	m.messageID = messageID
 	m.routeID = routeID

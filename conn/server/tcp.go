@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/chen102/ggbond/conn/connect"
 	"github.com/chen102/ggbond/message"
@@ -108,36 +109,56 @@ func (s *TCPServer) acceptConnections() {
 				log.Printf("Error accepting connection: %v\n", err)
 				continue
 			}
+			if s.connManager.OutTimeOption("readwriteTimeout") != 0 {
+				timeout := time.Duration(s.connManager.OutTimeOption("readwriteTimeout")) * time.Second
+				if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+					log.Printf("Error accepting connection: %v\n", err)
+					continue
+				}
+			}
+			if s.connManager.OutTimeOption("readTimeout") != 0 {
+				timeout := time.Duration(s.connManager.OutTimeOption("readTimeout")) * time.Second
+				if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+					log.Printf("Error accepting connection: %v\n", err)
+					continue
+				}
+			}
+			if s.connManager.OutTimeOption("writeTimeout") != 0 {
+				timeout := time.Duration(s.connManager.OutTimeOption("writeTimeout")) * time.Second
+				if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+					log.Printf("Error accepting connection: %v\n", err)
+					continue
+				}
+			}
+
+			//设置连接超时时间
 			go s.handle(conn)
 		}
 	}
 }
 func (s *TCPServer) handle(tcpconn net.Conn) error {
 	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(context.Background())
 	conn := connect.NewConn(tcpconn, GenerateConnID(), "tcp")
-	//连接前的OOK
-	if s.connManager.Hook() != nil {
-		if err := s.connManager.Hook().BeforConn(conn); err != nil {
-			return err
-		}
-	}
+	timeout := time.Now().Add(time.Duration(s.connManager.OutTimeOption("connectionTimedOut")) * time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	if err := s.connManager.AddConn(conn); err != nil {
-		tcpconn.Close()
-		return err
+		return conn.Close(err)
 	}
-	go s.tcpreader(ctx, &wg, conn)
-	go tcpwrite(ctx, &wg, conn)
 	if s.connManager.Hook() != nil {
-		if err := s.connManager.Hook().AfterConn(conn); err != nil {
-			return err
+		err := s.connManager.Hook().AfterConn(conn)
+		if err != nil {
+			log.Println("hook error:", err)
+			return s.connManager.RemoveConn(conn, err)
 		}
 	}
-	defer func() {
-		if s.connManager.Hook() != nil {
-			s.connManager.Hook().CloseConn(conn)
-		}
-	}()
+
+	if time.Now().After(timeout) {
+		log.Println("connect timeout...")
+		return s.connManager.RemoveConn(conn, errors.New("connect timeout..."))
+	}
+	go s.tcpreader(ctx, &wg, conn, int(s.connManager.ReadBuffer()))
+	go s.tcpwrite(ctx, &wg, conn, int(s.connManager.WriteBuffer()))
 	for {
 		select {
 		case <-s.stopChannel:
@@ -145,12 +166,14 @@ func (s *TCPServer) handle(tcpconn net.Conn) error {
 			wg.Wait()
 			return s.connManager.RemoveConn(conn, errors.New("server stop"))
 		case err := <-conn.WaitForClosed(): //读写协程出错，或者正常关闭
+			if err != nil {
+				log.Println("conn closed:", err)
+			}
 			cancel()
 			wg.Wait()
 			return s.connManager.RemoveConn(conn, err)
 		}
 	}
-
 }
 
 // 生成UUIDV4的murmur3算法int32 hash值
@@ -160,72 +183,112 @@ func GenerateConnID() int32 {
 	_, _ = hasher.Write([]byte(uuid.NewV4().String()))
 	return int32(hasher.Sum32() % math.MaxInt32)
 }
-func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn connect.ITCPConn) {
-	reader := bufio.NewReader(conn.Reader())
+func (s *TCPServer) tcpreader(ctx context.Context, wg *sync.WaitGroup, conn connect.ITCPConn, buffsize int) {
+	reader := bufio.NewReaderSize(conn.Reader(), buffsize)
 	wg.Add(1)
+	if err := s.resetTimeOut(conn, "readwriteTimeout"); err != nil {
+		return
+	}
+	if err := s.resetTimeOut(conn, "readTimeout"); err != nil {
+		return
+	}
+	defer log.Printf("conn %d tcpreader done", conn.ConnID())
 	defer wg.Done()
 	log.Printf("conn %d tcpreader start...", conn.ConnID())
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("conn %d tcpreader done", conn.ConnID())
 			return
 		default:
-			if !conn.CheckHealth(s.connManager.OutTimeOption("detectionTimeout")) {
-				log.Printf("conn %d tcpreader done", conn.ConnID())
-				conn.SignalClose(errors.New("conn time out"))
-				return
-			}
 			msg, err := s.msgpool.Get("tcp")
 			if err != nil {
-				log.Printf("conn %d tcpreader done", conn.ConnID())
 				conn.SignalClose(fmt.Errorf("get msg err:%w", err))
 				return
 			}
 			if err := msg.ReadAndUnpack(reader); errors.Is(err, io.EOF) {
-				log.Printf("conn %d tcpreader done", conn.ConnID())
-				conn.SignalClose(errors.New("read eof"))
+				// log.Println("read eof")
+				conn.SignalClose(fmt.Errorf("readandunpack error:%w", err))
+				return
+			} else if operr, ok := err.(net.Error); ok && operr.Timeout() { //若设置了读超时时间，读超时后关闭连接
+				conn.SignalClose(fmt.Errorf("readandunpack error:%w", err))
 				return
 			}
+
 			log.Println("read from conn:", string(msg.Body()), msg.MessageID())
-			// switch msg.GetRouteID() {
-			// case 1:
-			// 	conn.UpdateLastActiveTime()
-			// 	continue
-			// case 9:
-			// 	log.Printf("user %s logout", string(msg.GetBody()))
-			// 	conn.SignalClose(nil)
-			// 	return
-			// }
 			if err := s.router.HandleMessage(msg.RouteID(), conn.ConnID(), msg.MessageID(), msg.Body()); err != nil {
 				log.Println("route error:", err, "msg:", msg)
 			}
 			if err := s.msgpool.Put("tcp", msg); err != nil {
-				log.Printf("conn %d tcpreader done", conn.ConnID())
 				conn.SignalClose(fmt.Errorf("put msg err:%w", err))
+				return
+			}
+			if err := s.resetTimeOut(conn, "readwriteTimeout"); err != nil {
+				conn.SignalClose(fmt.Errorf("set readwriteTimeout err:%w", err))
+				return
+			}
+			if err := s.resetTimeOut(conn, "readTimeout"); err != nil {
+				conn.SignalClose(fmt.Errorf("set readTimeout err:%w", err))
 				return
 			}
 		}
 	}
 }
-func tcpwrite(ctx context.Context, wg *sync.WaitGroup, conn connect.ITCPConn) {
-	writer := bufio.NewWriter(conn.Sender())
+func (s *TCPServer) tcpwrite(ctx context.Context, wg *sync.WaitGroup, conn connect.ITCPConn, buffsize int) {
+	writer := bufio.NewWriterSize(conn.Sender(), buffsize)
 	wg.Add(1)
+	if err := s.resetTimeOut(conn, "readwriteTimeout"); err != nil {
+		conn.SignalClose(fmt.Errorf("set readwriteTimeout err:%w", err))
+		return
+	}
+	if err := s.resetTimeOut(conn, "writeTimeout"); err != nil {
+		conn.SignalClose(fmt.Errorf("set writeTimeout err:%w", err))
+		return
+	}
 	defer wg.Done()
+	defer log.Printf("conn %d tcpwrite done", conn.ConnID())
 	log.Printf("conn %d tcpwrite start...", conn.ConnID())
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("conn %d tcpwrite done", conn.ConnID())
 			return
 		case msg := <-conn.MessageChan():
 			// log.Println("write to conn...")
 			if err := msg.PackAndWrite(writer); err != nil {
-				log.Printf("conn %d tcpwrite done", conn.ConnID())
-				conn.SignalClose(errors.New("write eof"))
+				conn.SignalClose(fmt.Errorf("packandwrite error:%w", err))
+				return
+			} else if operr, ok := err.(net.Error); ok && operr.Timeout() { //若设置了读超时时间，读超时后关闭连接
+				conn.SignalClose(fmt.Errorf("packandwrite error:%w", err))
+				return
+			}
+			if err := s.resetTimeOut(conn, "readwriteTimeout"); err != nil {
+				conn.SignalClose(fmt.Errorf("set readwriteTimeout err:%w", err))
+				return
+			}
+			if err := s.resetTimeOut(conn, "writeTimeout"); err != nil {
+				conn.SignalClose(fmt.Errorf("set writeTimeout err:%w", err))
 				return
 			}
 			// log.Println("write to conn:", msg)
 		}
 	}
+}
+func (s *TCPServer) resetTimeOut(conn connect.ITCPConn, timeouttype string) error {
+	if s.connManager.OutTimeOption(timeouttype) != 0 {
+
+		log.Println("set timeout:", timeouttype, s.connManager.OutTimeOption(timeouttype))
+		if timeouttype == "readwriteTimeout" {
+			if err := conn.SetDeadline(s.connManager.OutTimeOption(timeouttype)); err != nil {
+				return err
+			}
+		} else if timeouttype == "readTimeout" {
+			if err := conn.SetReadDeadline(s.connManager.OutTimeOption(timeouttype)); err != nil {
+				return err
+			}
+		} else if timeouttype == "writeTimeout" {
+			if err := conn.SetWriteDeadline(s.connManager.OutTimeOption(timeouttype)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

@@ -79,6 +79,21 @@ func (c *TCP) Close(err error) error {
 	return c.conn.Close()
 }
 
+//两种不同的超时方式 1.通过系统路由心跳命令，更新上次活动时间，每一段时间检查一次，判断是否超时（业务实现）
+//2.通过net.Conn.SetDeadline()设置超时时间，每次读写都会更新超时时间，判断是否超时（底层实现)
+func (c *TCP) SetDeadline(i int64) error {
+	timeout := time.Duration(i) * time.Second
+	return c.conn.SetDeadline(time.Now().Add(timeout))
+}
+func (c *TCP) SetReadDeadline(i int64) error {
+	timeout := time.Duration(i) * time.Second
+	return c.conn.SetReadDeadline(time.Now().Add(timeout))
+}
+func (c *TCP) SetWriteDeadline(i int64) error {
+	timeout := time.Duration(i) * time.Second
+	return c.conn.SetWriteDeadline(time.Now().Add(timeout))
+}
+
 // 更新最后活跃时间
 func (c *TCP) UpdateLastActiveTime() {
 	c.lastactivatetime = time.Now().Unix()

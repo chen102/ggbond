@@ -23,6 +23,11 @@ type TCPConnManager struct {
 	transmissionTimeout int64 //传输超时时间
 	explorationCycle    int64 //探测周期
 	detectionTimeout    int64 //探测超时时间 每个连接探测超时时间，用次参数来监控连接是否正常
+	readwriteTimeout    int64 //读写超时时间
+	readTimeout         int64 //读超时时间
+	writeTimeout        int64 //写超时时间
+	readbuffer          int32 //读缓冲区大小
+	writebuffer         int32 //写缓冲区大小
 }
 
 // NewTCPConnManager 创建一个tcp连接管理器
@@ -92,7 +97,7 @@ func (m *TCPConnManager) CheckHealths(ctx context.Context) {
 					stat := conn.Stat()
 					if stat < 0 {
 						log.Println("check health:", id, "failed")
-						if err := m.RemoveConn(conn, errors.New("conn time out")); err != nil {
+						if err := m.RemoveConn(conn, errors.New("connect timeout")); err != nil {
 							log.Println("remove conn:", id, "failed")
 						}
 						m.Del(key.(int32))
@@ -138,7 +143,22 @@ func (m *TCPConnManager) OutTimeOption(name string) int64 {
 	if name == "detectionTimeout" {
 		return m.detectionTimeout
 	}
+	if name == "readwriteTimeout" {
+		return m.readwriteTimeout
+	}
+	if name == "readTimeout" {
+		return m.readTimeout
+	}
+	if name == "writeTimeout" {
+		return m.writeTimeout
+	}
 	return 0
+}
+func (m *TCPConnManager) ReadBuffer() int32 {
+	return m.readbuffer
+}
+func (m *TCPConnManager) WriteBuffer() int32 {
+	return m.writebuffer
 }
 
 // GetAllConn 获取所有连接
@@ -165,6 +185,11 @@ func (m *TCPConnManager) setoption(opt ...ConnManagerOption) error {
 		transmissionTimeout int64 = 2
 		explorationCycle    int64 = 15
 		detectionTimeout    int64 = 30
+		readwriteTimeout    int64 = 0
+		readTimeout         int64 = 6
+		writeTimeout        int64 = 1
+		readbuffer          int32 = 1024
+		writebuffer         int32 = 1024
 	)
 	if options.maximumConnection != nil {
 		if *options.maximumConnection < 0 || *options.maximumConnection > math.MaxInt32 {
@@ -173,32 +198,69 @@ func (m *TCPConnManager) setoption(opt ...ConnManagerOption) error {
 		maximumConnection = *options.maximumConnection
 	}
 	if options.connectionTimedOut != nil {
-		if *options.connectionTimedOut < 0 || *options.connectionTimedOut > math.MaxInt32 {
+		if *options.connectionTimedOut < 0 || *options.connectionTimedOut > math.MaxInt64 {
 			fmt.Errorf("%w:connectionTimedOut is not valid", baseerr)
 		}
 		connectionTimedOut = *options.connectionTimedOut
 	}
 	if options.transmissionTimeout != nil {
-		if *options.transmissionTimeout < 0 || *options.transmissionTimeout > math.MaxInt32 {
+		if *options.transmissionTimeout < 0 || *options.transmissionTimeout > math.MaxInt64 {
 			fmt.Errorf("%w:transmissionTimeout is not valid", baseerr)
 		}
 	}
 	if options.explorationCycle != nil {
-		if *options.explorationCycle < 0 || *options.explorationCycle > math.MaxInt32 {
+		if *options.explorationCycle < 0 || *options.explorationCycle > math.MaxInt64 {
 			fmt.Errorf("%w:explorationCycle is not valid", baseerr)
 		}
 		explorationCycle = *options.explorationCycle
 	}
 	if options.detectionTimeout != nil {
-		if *options.detectionTimeout < 0 || *options.detectionTimeout > math.MaxInt32 {
+		if *options.detectionTimeout < 0 || *options.detectionTimeout > math.MaxInt64 {
 			fmt.Errorf("%w:detectionTimeout is not valid", baseerr)
 		}
 		detectionTimeout = *options.detectionTimeout
 	}
+	if options.readwriteTimeout != nil {
+		if *options.readwriteTimeout < 0 || *options.readwriteTimeout > math.MaxInt64 {
+			fmt.Errorf("%w:readwriteTimeout is not valid", baseerr)
+		}
+		readwriteTimeout = *options.readwriteTimeout
+	}
+	if options.readTimeout != nil {
+		if *options.readTimeout < 0 || *options.readTimeout > math.MaxInt64 {
+			fmt.Errorf("%w:readTimeout is not valid", baseerr)
+		}
+		readTimeout = *options.readTimeout
+	}
+	if options.writeTimeout != nil {
+		if *options.writeTimeout < 0 || *options.writeTimeout > math.MaxInt64 {
+			fmt.Errorf("%w:writeTimeout is not valid", baseerr)
+		}
+		writeTimeout = *options.writeTimeout
+	}
+	if options.readbuffer != nil {
+		if *options.readbuffer < 0 || *options.readbuffer > math.MaxInt32 {
+			fmt.Errorf("%w:readbuffer is not valid", baseerr)
+		}
+		readbuffer = *options.readbuffer
+	}
+	if options.writebuffer != nil {
+		if *options.writebuffer < 0 || *options.writebuffer > math.MaxInt32 {
+			fmt.Errorf("%w:writebuffer is not valid", baseerr)
+		}
+		writebuffer = *options.writebuffer
+	}
+
 	m.maximumConnection = maximumConnection
 	m.connectionTimedOut = connectionTimedOut
 	m.transmissionTimeout = transmissionTimeout
 	m.explorationCycle = explorationCycle
 	m.detectionTimeout = detectionTimeout
+	m.readwriteTimeout = readwriteTimeout
+	m.readTimeout = readTimeout
+	m.writeTimeout = writeTimeout
+	m.readbuffer = readbuffer
+	m.writebuffer = writebuffer
+
 	return nil
 }

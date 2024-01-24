@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -19,12 +20,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	writer := bufio.NewWriter(conn)
 	//捕获退出信号
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill)
 	go func() {
 		<-c
-		conn.Close()
+		// conn.Close()
 		os.Exit(1)
 	}()
 	//获取命令行
@@ -37,7 +39,7 @@ func main() {
 				SendMsg(conn, 1, id, nil)
 			}
 		}
-		SendMsg(conn, 10, 1000, nil)
+		SendMsg(writer, 10, 1000, []byte("chenhao"))
 	}()
 
 	for {
@@ -48,12 +50,12 @@ func main() {
 		fmt.Println(string(msg.Body()))
 
 	}
-
+	conn.Close()
 }
-func SendMsg(conn net.Conn, routeID, msgID int32, body []byte) error {
+func SendMsg(w io.Writer, routeID, msgID int32, body []byte) error {
 	msg := connect.NewMessage("tcp")
 	msg.Write(body, msgID, routeID)
-	return msg.PackAndWrite(conn)
+	return msg.PackAndWrite(w)
 }
 func RevMsg(conn net.Conn) connect.IMessage {
 	msg := connect.NewMessage("tcp")

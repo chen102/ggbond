@@ -18,6 +18,8 @@ type ITCPConnManage interface {
 	Hook() connect.Hook
 	AllConn() map[int32]connect.ITCPConn
 	OutTimeOption(string) int64
+	ReadBuffer() int32
+	WriteBuffer() int32
 }
 
 type IConnGroupMagage interface {

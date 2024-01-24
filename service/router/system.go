@@ -62,7 +62,6 @@ func (b *SystemService) ActiveShutdown() routermanage.RouterHandle {
 		if err := conn.SendMessage(msg); err != nil {
 			return fmt.Errorf("ActiveShutdown Router Error:%w,RouterId:%d", err, ACTIVESHUTDOWN)
 		}
-		conn.SignalClose(nil)
 		return nil
 	}
 }

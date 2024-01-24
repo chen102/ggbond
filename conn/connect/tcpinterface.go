@@ -21,12 +21,13 @@ type ITCPConn interface {
 	MessageChan() chan IMessage
 	Stat() ConnStat
 	SetStat(ConnStat)
+	SetDeadline(t int64) error
+	SetReadDeadline(t int64) error
+	SetWriteDeadline(t int64) error
 }
 
 type Hook interface {
-	BeforConn(ITCPConn) error
 	AfterConn(ITCPConn) error
-	CloseConn(ITCPConn) error
 }
 
 // NewConn 创建一个新的连接。
@@ -34,8 +35,6 @@ func NewConn(conn interface{}, connID int32, conntype string) ITCPConn {
 	switch conntype {
 	case "tcp":
 		return NewTCPConn(conn.(net.Conn), connID, conntype)
-	case "atcp":
-		return NewAsyncTcpConn(conn.(int), connID, conntype)
 	}
 	return nil
 }
